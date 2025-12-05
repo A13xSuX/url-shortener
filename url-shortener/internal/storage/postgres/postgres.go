@@ -23,6 +23,9 @@ type AnalyticsOptions struct {
 	IncludeUserAgent    bool
 	IncludeRecentAccess bool
 	RecentAccessLimit   int
+	DaysLimit           int
+	MonthsLimit         int
+	UserAgentLimit      int
 }
 
 func NewStorage(masterDSN string, slaveDSNs []string) (*Storage, error) {
@@ -216,8 +219,11 @@ func (s *Storage) GetAnalyticsWithOptions(alias string, opts AnalyticsOptions) (
 	analytics.RecentAccesses = []storage.AccessDetail{}
 
 	// Получаем детальную аналитику
-	// Получаем детальную аналитику
 	if opts.IncludeDayStats {
+		limit := opts.DaysLimit
+		if limit <= 0 {
+			limit = 30 // default
+		}
 		dayStats, err := s.getAnalyticsByDay(alias)
 		if err != nil {
 			zlog.Logger.Warn().Err(err).Str("alias", alias).Msg("Ошибка получения аналитики по дням")
@@ -226,6 +232,10 @@ func (s *Storage) GetAnalyticsWithOptions(alias string, opts AnalyticsOptions) (
 		}
 	}
 	if opts.IncludeMonthStats {
+		limit := opts.MonthsLimit
+		if limit <= 0 {
+			limit = 12 // default
+		}
 		monthStats, err := s.getAnalyticsByMonth(alias)
 		if err != nil {
 			zlog.Logger.Warn().Err(err).Str("alias", alias).Msg("Ошибка получения аналитики по месяцам")
@@ -234,16 +244,20 @@ func (s *Storage) GetAnalyticsWithOptions(alias string, opts AnalyticsOptions) (
 		}
 	}
 	if opts.IncludeUserAgent {
-		userAgentStats, err := s.getAnalyticsByMonth(alias)
+		limit := opts.UserAgentLimit
+		if limit <= 0 {
+			limit = 20 // default
+		}
+		userAgentStats, err := s.getAnalyticsByUserAgent(alias)
 		if err != nil {
 			zlog.Logger.Warn().Err(err).Str("alias", alias).Msg("Ошибка получения аналитики по User-Agent")
 		} else {
-			analytics.ByMonth = userAgentStats
+			analytics.ByUserAgent = userAgentStats
 		}
 	}
 	if opts.IncludeRecentAccess {
 		limit := opts.RecentAccessLimit
-		if limit == 0 {
+		if limit <= 0 {
 			limit = 10 //default
 		}
 		recentAccesses, err := s.getRecentAccesses(alias, limit)

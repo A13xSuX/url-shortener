@@ -3,7 +3,6 @@ package main
 import (
 	"delayedNotifier/url-shortener/internal/config"
 	"delayedNotifier/url-shortener/internal/storage/postgres"
-	"flag"
 	"fmt"
 	"log"
 
@@ -19,17 +18,8 @@ import (
 //handlers
 //servers
 
-var (
-	analyticsByDay          = flag.Bool("day", false, "Аналитика по дням")
-	analyticsByMonth        = flag.Bool("month", false, "Аналитика по месяцам")
-	analyticsByUserAgent    = flag.Bool("useragent", false, "Аналитика по User-Agent")
-	analyticsRecentAccesses = flag.Bool("recent", false, "Недавние + лимит по ним")
-	limit                   = flag.Int("limit", 0, "Лимит для недавних")
-)
-
 func main() {
 
-	flag.Parse()
 	//cfg
 	cfg, err := config.NewAppConfig()
 	if err != nil {
@@ -83,13 +73,26 @@ func main() {
 	}
 
 	optsAnalytics := postgres.AnalyticsOptions{
-		IncludeDayStats:     *analyticsByDay,
-		IncludeMonthStats:   *analyticsByMonth,
-		IncludeUserAgent:    *analyticsByUserAgent,
-		IncludeRecentAccess: *analyticsRecentAccesses,
-		RecentAccessLimit:   *limit,
+		IncludeDayStats:     cfg.AnalyticsConfig.Include.Days,
+		IncludeMonthStats:   cfg.AnalyticsConfig.Include.Months,
+		IncludeUserAgent:    cfg.AnalyticsConfig.Include.UserAgent,
+		IncludeRecentAccess: cfg.AnalyticsConfig.Include.RecentAccesses,
+		RecentAccessLimit:   cfg.AnalyticsConfig.Limit.RecentAccesses,
+		DaysLimit:           cfg.AnalyticsConfig.Limit.Days,
+		MonthsLimit:         cfg.AnalyticsConfig.Limit.Months,
+		UserAgentLimit:      cfg.AnalyticsConfig.Limit.UserAgents,
 	}
-	fmt.Println(optsAnalytics)
+	//отладка
+	fmt.Printf("\nПараметры аналитики:\n")
+	fmt.Printf("  Включить дни: %v (лимит: %d)\n",
+		optsAnalytics.IncludeDayStats, optsAnalytics.DaysLimit)
+	fmt.Printf("  Включить месяцы: %v (лимит: %d)\n",
+		optsAnalytics.IncludeMonthStats, optsAnalytics.MonthsLimit)
+	fmt.Printf("  Включить User-Agent: %v (лимит: %d)\n",
+		optsAnalytics.IncludeUserAgent, optsAnalytics.UserAgentLimit)
+	fmt.Printf("  Включить недавние переходы: %v (лимит: %d)\n",
+		optsAnalytics.IncludeRecentAccess, optsAnalytics.RecentAccessLimit)
+	//отладка
 	analytics, err := storage.GetAnalyticsWithOptions("mylove", optsAnalytics)
 	if err != nil {
 		zlog.Logger.Error().Err(err).Msg("Ошибка получения аналитики")
@@ -100,28 +103,30 @@ func main() {
 		fmt.Printf("  Создан: %s\n", analytics.CreatedAt.Format("2006-01-02 15:04:05"))
 		fmt.Printf("  Кликов: %d\n", analytics.Clicks)
 
-		// flags
-		if *analyticsByDay {
+		//доп аналитика(доделать мб и логировать бы в инфо
+		if optsAnalytics.IncludeDayStats {
+			fmt.Println("вывод по дням")
 			for _, stat := range analytics.ByDay {
 				fmt.Printf("  %s: %d кликов\n", stat.Date, stat.Clicks)
 			}
 		}
-		if *analyticsByMonth {
+		if optsAnalytics.IncludeMonthStats {
+			fmt.Println("вывод по месяцам")
 			for _, stat := range analytics.ByMonth {
 				fmt.Printf("  %s: %d кликов\n", stat.Month, stat.Clicks)
 			}
 		}
-		if *analyticsByUserAgent {
+		if optsAnalytics.IncludeUserAgent {
+			fmt.Println("вывод по юзерагенту")
 			for _, stat := range analytics.ByUserAgent {
 				fmt.Printf("  %s: %d кликов\n", stat.UserAgent, stat.Clicks)
 			}
 		}
-		if *analyticsRecentAccesses {
-			if *limit == 0 || *limit < 0 {
-				*limit = 10
-			}
+		if optsAnalytics.IncludeRecentAccess {
+			fmt.Println("вывод по недавни")
 			for _, stat := range analytics.RecentAccesses {
-				fmt.Printf("User-Agent: %s, IP: %d, AccessedAt: %s, Referrer: %s", stat.UserAgent, stat.IPAddress, stat.AccessedAt, stat.Referrer)
+				fmt.Printf("  %s\n %s\n  %s\n %s\n", stat.AccessedAt.Format("2006-01-02 15:04:05"),
+					stat.UserAgent, stat.IPAddress, stat.Referrer)
 			}
 		}
 	}

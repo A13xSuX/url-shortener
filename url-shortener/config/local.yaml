@@ -21,3 +21,18 @@ postgres:
   conn_max_lifetime: 60
 #  port: 5432
 # storage path?(не надо так как мы в postgre, хотя может и оможно)
+
+analytics:
+  # What to include in analytics
+  include:
+    days: true
+    months: true
+    user_agent: true
+    recent_accesses: true
+
+  # Limits for each type
+  limits:
+    recent_accesses: 10
+    days: 30
+    months: 12
+    user_agents: 20
