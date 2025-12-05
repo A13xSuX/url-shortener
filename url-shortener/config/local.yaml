@@ -1,0 +1,23 @@
+# env
+env: "local"
+# http(address, timeout, idle timeout
+server:
+  address: "localhost:8080"
+#  timeout: 5s
+#  idle_timeout: 60s
+
+#logger
+logger:
+  level: debug
+# postgres
+postgres:
+#  POSTGRES_HOST: localhost
+#  POSTGRES_PORT: 5432
+#  POSTGRES_USER: user
+#  POSTGRES_PASSWORD: password
+#  POSTGRES_DB: dbname
+  max_idle_connections: 10
+  max_open_connections: 5
+  conn_max_lifetime: 60
+#  port: 5432
+# storage path?(не надо так как мы в postgre, хотя может и оможно)
