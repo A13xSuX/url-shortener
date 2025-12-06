@@ -3,8 +3,10 @@ package handlers
 import (
 	"delayedNotifier/url-shortener/internal/storage/postgres"
 	"encoding/json"
+	"math/rand"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/wb-go/wbf/zlog"
 )
@@ -67,4 +69,64 @@ func (h *Handler) ShortenURL(w http.ResponseWriter, r *http.Request) {
 	}
 	//почему где то str с ключом а где msg можно же msgf
 	zlog.Logger.Info().Str("alias", alias).Str("url", req.URL).Msg("URL успешно сохранен")
+}
+
+func (h *Handler) RedirectURL(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	//extract alias
+	path := strings.TrimPrefix(r.URL.Path, "/s") //remeber what to do TrimPrefix
+	if path == "" || path == "/s" {
+		http.Error(w, "Short URL not provided", http.StatusBadRequest)
+		return
+	}
+	alias := path
+	// Получаем User-Agent, IP и Referrer
+	userAgent := r.UserAgent()
+	ipAddress := getClientIP(r)
+	referrer := r.Referer()
+
+	//get orig url
+	url, err := h.Storage.GetURL(alias, userAgent, ipAddress, referrer)
+	if err != nil {
+		if strings.Contains(err.Error(), "not found") {
+			http.Error(w, "Short URL not found", http.StatusNotFound)
+			return
+		}
+		zlog.Logger.Error().Err(err).Msg("Short URL not found")
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	http.Redirect(w, r, url, http.StatusFound)
+
+	zlog.Logger.Info().Str("alias", alias).Str("url", url).Str("ip", ipAddress).Msg("Редирект выполнен")
+}
+
+func generateRandomAlias(length int) string {
+	rnd := rand.New(rand.NewSource(time.Now().UnixNano()))
+
+	chars := []rune("ABCDEFGHIJKLMNOPQRSTUVWXYZ" +
+		"abcdefghijklmnopqrstuvwxyz" +
+		"0123456789")
+	result := make([]rune, length)
+	for i := range result {
+		result[i] = chars[rnd.Intn(len(chars))]
+	}
+	return string(result)
+}
+
+func getClientIP(r *http.Request) string {
+	ip := r.Header.Get("X-Forwarded-For")
+	if ip != "" {
+		return ip
+	}
+	ip = r.Header.Get("X-Real-IP")
+	if ip != "" {
+		return ip
+	}
+	// Если нет заголовков, используем RemoteAddr
+	return strings.Split(r.RemoteAddr, ":")[0] //что делает
 }
