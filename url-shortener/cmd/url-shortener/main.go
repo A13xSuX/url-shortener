@@ -2,9 +2,11 @@ package main
 
 import (
 	"delayedNotifier/url-shortener/internal/config"
+	"delayedNotifier/url-shortener/internal/http-server/handlers"
 	"delayedNotifier/url-shortener/internal/storage/postgres"
 	"fmt"
 	"log"
+	"net/http"
 
 	_ "github.com/lib/pq"
 	"github.com/wb-go/wbf/dbpg"
@@ -63,75 +65,98 @@ func main() {
 	//if err != nil {
 	//	zlog.Logger.Error().Err(err).Msg("Ошибка сохранения URL")
 	//}
+	//
+	////get
+	//url, err := storage.GetURL("mylove", "test-agent", "127.0.0.1", "")
+	//if err != nil {
+	//	zlog.Logger.Error().Err(err).Msg("Не нашел почтально печкин")
+	//} else {
+	//	zlog.Logger.Info().Msgf("нашли прикинь: %s", url)
+	//}
+	//
+	//optsAnalytics := postgres.AnalyticsOptions{
+	//	IncludeDayStats:     cfg.AnalyticsConfig.Include.Days,
+	//	IncludeMonthStats:   cfg.AnalyticsConfig.Include.Months,
+	//	IncludeUserAgent:    cfg.AnalyticsConfig.Include.UserAgent,
+	//	IncludeRecentAccess: cfg.AnalyticsConfig.Include.RecentAccesses,
+	//	RecentAccessLimit:   cfg.AnalyticsConfig.Limit.RecentAccesses,
+	//	DaysLimit:           cfg.AnalyticsConfig.Limit.Days,
+	//	MonthsLimit:         cfg.AnalyticsConfig.Limit.Months,
+	//	UserAgentLimit:      cfg.AnalyticsConfig.Limit.UserAgents,
+	//}
+	////отладка
+	//fmt.Printf("\nПараметры аналитики:\n")
+	//fmt.Printf("  Включить дни: %v (лимит: %d)\n",
+	//	optsAnalytics.IncludeDayStats, optsAnalytics.DaysLimit)
+	//fmt.Printf("  Включить месяцы: %v (лимит: %d)\n",
+	//	optsAnalytics.IncludeMonthStats, optsAnalytics.MonthsLimit)
+	//fmt.Printf("  Включить User-Agent: %v (лимит: %d)\n",
+	//	optsAnalytics.IncludeUserAgent, optsAnalytics.UserAgentLimit)
+	//fmt.Printf("  Включить недавние переходы: %v (лимит: %d)\n",
+	//	optsAnalytics.IncludeRecentAccess, optsAnalytics.RecentAccessLimit)
+	////отладка
+	//analytics, err := storage.GetAnalyticsWithOptions("mylove", optsAnalytics)
+	//if err != nil {
+	//	zlog.Logger.Error().Err(err).Msg("Ошибка получения аналитики")
+	//} else {
+	//	zlog.Logger.Info().Msg("Аналитика получена")
+	//	fmt.Printf("  Alias: %s\n", analytics.Alias)
+	//	fmt.Printf("  URL: %s\n", analytics.URL)
+	//	fmt.Printf("  Создан: %s\n", analytics.CreatedAt.Format("2006-01-02 15:04:05"))
+	//	fmt.Printf("  Кликов: %d\n", analytics.Clicks)
+	//
+	//	//доп аналитика(доделать мб и логировать бы в инфо
+	//	if optsAnalytics.IncludeDayStats {
+	//		fmt.Println("вывод по дням")
+	//		for _, stat := range analytics.ByDay {
+	//			fmt.Printf("  %s: %d кликов\n", stat.Date, stat.Clicks)
+	//		}
+	//	}
+	//	if optsAnalytics.IncludeMonthStats {
+	//		fmt.Println("вывод по месяцам")
+	//		for _, stat := range analytics.ByMonth {
+	//			fmt.Printf("  %s: %d кликов\n", stat.Month, stat.Clicks)
+	//		}
+	//	}
+	//	if optsAnalytics.IncludeUserAgent {
+	//		fmt.Println("вывод по юзерагенту")
+	//		for _, stat := range analytics.ByUserAgent {
+	//			fmt.Printf("  %s: %d кликов\n", stat.UserAgent, stat.Clicks)
+	//		}
+	//	}
+	//	if optsAnalytics.IncludeRecentAccess {
+	//		fmt.Println("вывод по недавни")
+	//		for _, stat := range analytics.RecentAccesses {
+	//			fmt.Printf("  %s\n %s\n  %s\n %s\n", stat.AccessedAt.Format("2006-01-02 15:04:05"),
+	//				stat.UserAgent, stat.IPAddress, stat.Referrer)
+	//		}
+	//	}
+	//}
+	//Server
+	handler := handlers.Handler{Storage: storage}
 
-	//get
-	url, err := storage.GetURL("mylove", "test-agent", "127.0.0.1", "")
-	if err != nil {
-		zlog.Logger.Error().Err(err).Msg("Не нашел почтально печкин")
-	} else {
-		zlog.Logger.Info().Msgf("нашли прикинь: %s", url)
+	http.HandleFunc("/shorten", handler.ShortenURL)
+	http.HandleFunc("/s/", handler.RedirectURL)
+	http.HandleFunc("/analytics/", handler.GetAnalytics)
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/" {
+			//w.Header().Set("Content-Type", "text/html")
+			fmt.Fprintf(w, `
+				POST /shorten - Создать короткую ссылку
+				GET /s/{alias} - Перейти по короткой ссылке
+				GET /analytics/{alias} - Получить аналитику
+			`)
+		}
+	})
+	port := cfg.ServerConfig.Address
+	if port == "" {
+		port = ":8080"
+	}
+	zlog.Logger.Info().Msgf("Сервер запущен на %s", port)
+
+	if err := http.ListenAndServe(port, nil); err != nil {
+		zlog.Logger.Fatal().Err(err).Msg("Ошибка запуска сервера")
 	}
 
-	optsAnalytics := postgres.AnalyticsOptions{
-		IncludeDayStats:     cfg.AnalyticsConfig.Include.Days,
-		IncludeMonthStats:   cfg.AnalyticsConfig.Include.Months,
-		IncludeUserAgent:    cfg.AnalyticsConfig.Include.UserAgent,
-		IncludeRecentAccess: cfg.AnalyticsConfig.Include.RecentAccesses,
-		RecentAccessLimit:   cfg.AnalyticsConfig.Limit.RecentAccesses,
-		DaysLimit:           cfg.AnalyticsConfig.Limit.Days,
-		MonthsLimit:         cfg.AnalyticsConfig.Limit.Months,
-		UserAgentLimit:      cfg.AnalyticsConfig.Limit.UserAgents,
-	}
-	//отладка
-	fmt.Printf("\nПараметры аналитики:\n")
-	fmt.Printf("  Включить дни: %v (лимит: %d)\n",
-		optsAnalytics.IncludeDayStats, optsAnalytics.DaysLimit)
-	fmt.Printf("  Включить месяцы: %v (лимит: %d)\n",
-		optsAnalytics.IncludeMonthStats, optsAnalytics.MonthsLimit)
-	fmt.Printf("  Включить User-Agent: %v (лимит: %d)\n",
-		optsAnalytics.IncludeUserAgent, optsAnalytics.UserAgentLimit)
-	fmt.Printf("  Включить недавние переходы: %v (лимит: %d)\n",
-		optsAnalytics.IncludeRecentAccess, optsAnalytics.RecentAccessLimit)
-	//отладка
-	analytics, err := storage.GetAnalyticsWithOptions("mylove", optsAnalytics)
-	if err != nil {
-		zlog.Logger.Error().Err(err).Msg("Ошибка получения аналитики")
-	} else {
-		zlog.Logger.Info().Msg("Аналитика получена")
-		fmt.Printf("  Alias: %s\n", analytics.Alias)
-		fmt.Printf("  URL: %s\n", analytics.URL)
-		fmt.Printf("  Создан: %s\n", analytics.CreatedAt.Format("2006-01-02 15:04:05"))
-		fmt.Printf("  Кликов: %d\n", analytics.Clicks)
-
-		//доп аналитика(доделать мб и логировать бы в инфо
-		if optsAnalytics.IncludeDayStats {
-			fmt.Println("вывод по дням")
-			for _, stat := range analytics.ByDay {
-				fmt.Printf("  %s: %d кликов\n", stat.Date, stat.Clicks)
-			}
-		}
-		if optsAnalytics.IncludeMonthStats {
-			fmt.Println("вывод по месяцам")
-			for _, stat := range analytics.ByMonth {
-				fmt.Printf("  %s: %d кликов\n", stat.Month, stat.Clicks)
-			}
-		}
-		if optsAnalytics.IncludeUserAgent {
-			fmt.Println("вывод по юзерагенту")
-			for _, stat := range analytics.ByUserAgent {
-				fmt.Printf("  %s: %d кликов\n", stat.UserAgent, stat.Clicks)
-			}
-		}
-		if optsAnalytics.IncludeRecentAccess {
-			fmt.Println("вывод по недавни")
-			for _, stat := range analytics.RecentAccesses {
-				fmt.Printf("  %s\n %s\n  %s\n %s\n", stat.AccessedAt.Format("2006-01-02 15:04:05"),
-					stat.UserAgent, stat.IPAddress, stat.Referrer)
-			}
-		}
-	}
-
-	//handlers
-	//flags
-	// will do redirect
+	// проверить хендлеры
 }
