@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"delayedNotifier/url-shortener/internal/config"
 	"delayedNotifier/url-shortener/internal/storage/postgres"
 	"encoding/json"
 	"math/rand"
@@ -13,6 +14,7 @@ import (
 
 type Handler struct {
 	Storage *postgres.Storage
+	Config  *config.AppConfig
 }
 
 type ShortenRequest struct {
@@ -77,8 +79,8 @@ func (h *Handler) RedirectURL(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	//extract alias
-	path := strings.TrimPrefix(r.URL.Path, "/s") //remeber what to do TrimPrefix
-	if path == "" || path == "/s" {
+	path := strings.TrimPrefix(r.URL.Path, "/s/") //remeber what to do TrimPrefix
+	if path == "" {
 		http.Error(w, "Short URL not provided", http.StatusBadRequest)
 		return
 	}

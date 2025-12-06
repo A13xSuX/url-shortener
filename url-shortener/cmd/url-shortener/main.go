@@ -133,7 +133,10 @@ func main() {
 	//	}
 	//}
 	//Server
-	handler := handlers.Handler{Storage: storage}
+	handler := handlers.Handler{
+		Storage: storage,
+		Config:  cfg,
+	}
 
 	http.HandleFunc("/shorten", handler.ShortenURL)
 	http.HandleFunc("/s/", handler.RedirectURL)
@@ -158,5 +161,6 @@ func main() {
 		zlog.Logger.Fatal().Err(err).Msg("Ошибка запуска сервера")
 	}
 
-	// проверить хендлеры
+	// Не логируются ошибки
+	// посмотреть handlers с этими доп параметрами
 }

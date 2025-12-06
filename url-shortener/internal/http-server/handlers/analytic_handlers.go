@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"delayedNotifier/url-shortener/internal/config"
 	"delayedNotifier/url-shortener/internal/storage/postgres"
 	"encoding/json"
 	"net/http"
@@ -16,8 +15,8 @@ func (h *Handler) GetAnalytics(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	path := strings.TrimPrefix(r.URL.Path, "/analytics")
-	if path == "" || path == "/analytics" {
+	path := strings.TrimPrefix(r.URL.Path, "/analytics/")
+	if path == "" {
 		http.Error(w, "Short URL not provided", http.StatusBadRequest)
 		return
 	}
@@ -26,7 +25,7 @@ func (h *Handler) GetAnalytics(w http.ResponseWriter, r *http.Request) {
 	query := r.URL.Query()
 	includeDays := query.Get("days") == "true"
 	includeMonths := query.Get("months") == "true"
-	includeUA := query.Get("ua") == "true"
+	includeUA := query.Get("user_agent") == "true"
 	includeRecent := query.Get("recent") == "true"
 
 	limitRecent := 10
@@ -57,21 +56,19 @@ func (h *Handler) GetAnalytics(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Используем конфигурацию или параметры запроса
-	cfg, err := config.NewAppConfig()
 	var optsAnalytics postgres.AnalyticsOptions
 
-	if err == nil {
+	if h.Config == nil {
 		// Используем конфигурацию, но переопределяем параметрами запроса
 		optsAnalytics = postgres.AnalyticsOptions{
-			IncludeDayStats:     cfg.AnalyticsConfig.Include.Days || includeDays,
-			IncludeMonthStats:   cfg.AnalyticsConfig.Include.Months || includeMonths,
-			IncludeUserAgent:    cfg.AnalyticsConfig.Include.UserAgent || includeUA,
-			IncludeRecentAccess: cfg.AnalyticsConfig.Include.RecentAccesses || includeRecent,
-			RecentAccessLimit:   cfg.AnalyticsConfig.Limit.RecentAccesses,
-			DaysLimit:           cfg.AnalyticsConfig.Limit.Days,
-			MonthsLimit:         cfg.AnalyticsConfig.Limit.Months,
-			UserAgentLimit:      cfg.AnalyticsConfig.Limit.UserAgents,
+			IncludeDayStats:     h.Config.AnalyticsConfig.Include.Days || includeDays,
+			IncludeMonthStats:   h.Config.AnalyticsConfig.Include.Months || includeMonths,
+			IncludeUserAgent:    h.Config.AnalyticsConfig.Include.UserAgent || includeUA,
+			IncludeRecentAccess: h.Config.AnalyticsConfig.Include.RecentAccesses || includeRecent,
+			RecentAccessLimit:   h.Config.AnalyticsConfig.Limit.RecentAccesses,
+			DaysLimit:           h.Config.AnalyticsConfig.Limit.Days,
+			MonthsLimit:         h.Config.AnalyticsConfig.Limit.Months,
+			UserAgentLimit:      h.Config.AnalyticsConfig.Limit.UserAgents,
 		}
 	} else {
 		// Используем только параметры запроса
